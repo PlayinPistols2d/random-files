@@ -1,0 +1,73 @@
+// jsontreeview.h
+
+#ifndef JSONTREEVIEW_H
+#define JSONTREEVIEW_H
+
+#include <QTreeView>
+#include <QJsonDocument>
+#include <QStandardItemModel>
+
+class JsonTreeView : public QTreeView
+{
+    Q_OBJECT
+
+public:
+    explicit JsonTreeView(QWidget *parent = nullptr);
+    void setJson(const QString& json);
+
+private:
+    void populateModel(const QJsonObject& jsonObject, QStandardItem* parentItem = nullptr);
+
+private:
+    QStandardItemModel m_model;
+};
+
+#endif // JSONTREEVIEW_H
+
+
+// jsontreeview.cpp
+
+#include "jsontreeview.h"
+
+JsonTreeView::JsonTreeView(QWidget *parent) : QTreeView(parent)
+{
+    setModel(&m_model);
+}
+
+void JsonTreeView::setJson(const QString& json)
+{
+    QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
+    if (!doc.isNull()) {
+        QStandardItem* rootItem = m_model.invisibleRootItem();
+        rootItem->removeRows(0, rootItem->rowCount());
+        if (doc.isObject()) {
+            QJsonObject obj = doc.object();
+            populateModel(obj, rootItem);
+        }
+    }
+}
+
+void JsonTreeView::populateModel(const QJsonObject& jsonObject, QStandardItem* parentItem)
+{
+    for (auto it = jsonObject.begin(); it != jsonObject.end(); ++it) {
+        QStandardItem* keyItem = new QStandardItem(it.key());
+        if (it.value().isObject()) {
+            populateModel(it.value().toObject(), keyItem);
+        } else if (it.value().isArray()) {
+            QJsonArray array = it.value().toArray();
+            for (int i = 0; i < array.size(); ++i) {
+                if (array.at(i).isObject()) {
+                    QStandardItem* arrayItem = new QStandardItem("[" + QString::number(i) + "]");
+                    populateModel(array.at(i).toObject(), arrayItem);
+                    keyItem->appendRow(arrayItem);
+                }
+            }
+        } else {
+            QStandardItem* valueItem = new QStandardItem(it.value().toVariant().toString());
+            keyItem->setEditable(false);
+            valueItem->setEditable(false);
+            parentItem->appendRow({keyItem, valueItem});
+        }
+        parentItem->appendRow(keyItem);
+    }
+}
